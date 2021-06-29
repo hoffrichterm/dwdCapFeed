@@ -150,7 +150,12 @@ class dwdCapMessage extends dwdCapMessageBase {
 							}
 						}
 						if ($this->event == null){
-							echo "Warning: - Cannot determine event ".$this->eventName." (iicode:".$this->iicode.")\n";
+							// There is a bug: the Seewetterdienst is sending wrong iicodes
+							if ($this->senderName == 'DWD / Seewetterdienst Hamburg' && ($this->iicode == 11 || $this->iicode == 12)){
+								// Do nothing
+							} else {
+								echo "Warning: - Cannot determine event ".$this->eventName." (iicode:".$this->iicode.")\n";
+							}
 						}
 					} else {
 						echo "Warning ".$this->eventName." not found\n";
@@ -214,7 +219,7 @@ class dwdCapMessage extends dwdCapMessageBase {
 					} else {
 						$areacolorsql = '';
 						$areacolorfields = array();
-						$areacolorfields[] = array('name' => 'cap_data_areaColor_name', "value" => $this->areaColor, "type" => PDO::PARAM_STR,'unique' => true);
+						$areacolorfields[] = array('name' => 'areaColor_name', "value" => $this->areaColor, "type" => PDO::PARAM_STR,'unique' => true);
 						$areaColorId = horizonMySQL::insert('cap_data_areaColors',$areacolorfields);
 						if ($areaColorId == 0) {
 							throw new Exception('Could not insert areaColor',1023);

@@ -88,14 +88,18 @@ class dwdCapFeed {
 			$clsUrl = new horizonUrl();
 			foreach($this->files as $filename => $fileinfo){
 				if (!isset($this->history[$filename])){
-					$ret = $clsUrl->get($filename);
-					if ($ret){
-						$tmpfile = horizonFile::writeTempFile($clsUrl->getBody());
-						if ($tmpfile){
-							if(horizonZipFile::Unzip($tmpfile,$this->importdir)){
-								if (horizonFile::unlinkFile($tmpfile)){
-									$this->history[$filename] = $fileinfo;
-									$updatelastrun = true;
+					try {
+						$ret = $clsUrl->get($filename);
+						if ($ret){
+							$tmpfile = horizonFile::writeTempFile($clsUrl->getBody());
+							if ($tmpfile){
+								if(horizonZipFile::Unzip($tmpfile,$this->importdir)){
+									if (horizonFile::unlinkFile($tmpfile)){
+										$this->history[$filename] = $fileinfo;
+										$updatelastrun = true;
+									}
+								} else {
+									return false;
 								}
 							} else {
 								return false;
@@ -103,9 +107,12 @@ class dwdCapFeed {
 						} else {
 							return false;
 						}
-					} else {
+					} catch (Exception $e) {
+						echo "Exception found:\n";
+						echo $e->getCode()."\n";
+						echo $e->getMessage()."\n";
 						return false;
-					}
+					} 
 				}
 			}
 			$clsUrl = null;
@@ -118,42 +125,46 @@ class dwdCapFeed {
 	}
 	
 	protected function getFileList(){
-		$url = $this::CONTENTLOG;
-		$tmp = horizonUrl::parseUrl($url);
-		$base = $tmp['scheme'].'://'.$tmp['host'].$tmp['dirname'];
-		$clsUrl = new horizonUrl();
-		$ret = $clsUrl->get($url);
-		if ($ret){
-			$str = horizonBunzip2::Decompress($clsUrl->getBody(),true);
-			$clsUrl = null;
-			if ($str){
-				$separator = "\n";
-				$line = strtok($str, $separator);
-				while ($line !== false) {
-					# do something with $line
-					$tmpline = $line;
-					$line = strtok( $separator );
-					$tmp = explode("|",$tmpline);
-					if ($tmp[1] == 22) {
-						continue;
+		try {
+			$url = $this::CONTENTLOG;
+			$tmp = horizonUrl::parseUrl($url);
+			$base = $tmp['scheme'].'://'.$tmp['host'].$tmp['dirname'];
+			$clsUrl = new horizonUrl();
+			$ret = $clsUrl->get($url);
+			if ($ret){
+				$str = horizonBunzip2::Decompress($clsUrl->getBody(),true);
+				$clsUrl = null;
+				if ($str){
+					$separator = "\n";
+					$line = strtok($str, $separator);
+					while ($line !== false) {
+						# do something with $line
+						$tmpline = $line;
+						$line = strtok( $separator );
+						$tmp = explode("|",$tmpline);
+						if ($tmp[1] == 22) {
+							continue;
+						}
+						if (preg_match("!^(\.)(/cap/COMMUNEUNION_EVENT_DIFF/Z_CAP_C_EDZW_.*)$!",$tmp[0],$regs)){
+							$this->files[$base.$regs[2]] = array('filesize' => $tmp[1],'date' => strtotime($tmp[2]));
+						} else {
+							continue;
+						}
 					}
-					if (preg_match("!^(\.)(/cap/COMMUNEUNION_EVENT_DIFF/Z_CAP_C_EDZW_.*)$!",$tmp[0],$regs)){
-						$this->files[$base.$regs[2]] = array('filesize' => $tmp[1],'date' => strtotime($tmp[2]));
-					} else {
-						continue;
-					}
+					return true;
+				} else {
+					throw new Exception('Content.log is empty ',1004);
 				}
-				return true;
 			} else {
-				throw new Exception('Content.log is empty ',1004);
+				$clsUrl = null;
+				throw new Exception('Cannot get url '.$url,1005);
 			}
-		} else {
 			$clsUrl = null;
-			throw new Exception('Cannot get url '.$url,1005);
-			
+			return false;
+		} catch (Exception $e){
+			echo "Exception: ".$e->getCode()."\n";
+			echo "Message: ".$e->getMessage()."\n";
 		}
-		$clsUrl = null;
-		return false;
 	}
 	
 	protected function writeHistory(){
